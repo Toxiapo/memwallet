@@ -4,9 +4,14 @@ var pbkdf2 = require('pbkdf2');
 var scrypt = require('scrypt-js');
 var bs58 = require('bs58');
 var shajs = require('sha.js')
-var Ripemd160 = require('ripemd160');
+var Ripemd160 = require ('ripemd160');
 var keccak = require('keccak');
 var BN = require('bn.js');
+
+var OPS = require('bitcoin-ops');
+var typeforce = require('typeforce');
+var pushdata = require('pushdata-bitcoin');
+var bech32 = require('bech32');
 
 var s256 = new EC('secp256k1');
 var ed25519 = new EdDSA('ed25519');
@@ -17,6 +22,15 @@ function sha256(s) {
 
 function ripemd160(s) {
   return (new Ripemd160()).update(s).digest();
+}
+
+function hash160 (buffer) {
+  return ripemd160(sha256(buffer));
+}
+
+function encode(pubKeyHash) {
+   typeforce(typeforce.BufferN(20), pubKeyHash);
+  return compile([OPS.OP_0, pubKeyHash]);
 }
 
 function keccak256(s) {
@@ -30,12 +44,102 @@ function reduce32(s) {
   return (new BN(s, 'le').mod(new BN('1000000000000000000000000000000014def9dea2f79cd65812631a5cf5d3ed', 16))).toArrayLike(Buffer, 'le', 32);
 }
 
-function b58checkencode(version, buffer) {
+function b58checkencode(version, buffer, toCompress=false) {
   buffer = Buffer.concat([Buffer.alloc(1, version), buffer])
+
+  if(toCompress) buffer = Buffer.concat([buffer, Buffer.alloc(1, 01)]);
+
   var hash = sha256(sha256(buffer));
   buffer = Buffer.concat([buffer, hash.slice(0, 4)]);
   var encoded = bs58.encode(buffer);
   return encoded;
+}
+
+function toBech32(data, version, prefix) {
+  var words = bech32.toWords(data)
+  words.unshift(version)
+
+  return bech32.encode(prefix, words)
+}
+
+function bech32Encode (outputScript) {
+  var bech32 = 'bc';
+
+  if(pubKeyHashCheck(outputScript)) return toBech32(compile(outputScript).slice(2, 22), 0, bech32)
+  if(scriptHashCheck(outputScript)) return toBech32(compile(outputScript).slice(2, 34), 0, bech32)
+
+  throw new Error('No matching Address')
+}
+
+function pubKeyHashCheck(script) {
+  var buffer = compile(script)
+
+  return buffer.length === 22 &&
+    buffer[0] === OPS.OP_0 &&
+    buffer[1] === 0x14
+}
+
+function scriptHashCheck(script) {
+  var buffer = compile(script)
+
+  return buffer.length === 34 &&
+    buffer[0] === OPS.OP_0 &&
+    buffer[1] === 0x20
+}
+
+function compile(chunks) {
+  // TODO: remove me
+  if (Buffer.isBuffer(chunks)) return chunks
+
+  typeforce(typeforce.Array, chunks)
+  var bufferSize = chunks.reduce(function (accum, chunk) {
+    // data chunk
+    if (Buffer.isBuffer(chunk)) {
+      // adhere to BIP62.3, minimal push policy
+      if (chunk.length === 1 && (chunk[0] === 0x81 || (chunk[0] >= 1 && chunk[0] <= 16))) {
+        return accum + 1
+      }
+
+      return accum + pushdata.encodingLength(chunk.length) + chunk.length
+    }
+
+    // opcode
+    return accum + 1
+  }, 0.0)
+  var buffer = new Buffer(bufferSize)
+  var offset = 0
+
+  chunks.forEach(function (chunk) {
+    // data chunk
+    if (Buffer.isBuffer(chunk)) {
+      // adhere to BIP62.3, minimal push policy
+      if (chunk.length === 1 && chunk[0] >= 1 && chunk[0] <= 16) {
+        var opcode = OP_INT_BASE + chunk[0]
+        buffer.writeUInt8(opcode, offset)
+        offset += 1
+        return
+      }
+
+      if (chunk.length === 1 && chunk[0] === 0x81) {
+        buffer.writeUInt8(OPS.OP_1NEGATE, offset)
+        offset += 1
+        return
+      }
+
+      offset += pushdata.encode(buffer, chunk.length, offset)
+
+      chunk.copy(buffer, offset)
+      offset += chunk.length
+
+    // opcode
+    } else {
+      buffer.writeUInt8(chunk, offset)
+      offset += 1
+    }
+  })
+
+  if (offset !== buffer.length) throw new Error('Could not decode chunks')
+  return buffer
 }
 
 function keyToBitcoinish(key, version) {
@@ -52,6 +156,16 @@ function keyToBitcoin(key) {
 
 function keyToLitecoin(key) {
   return keyToBitcoinish(key, 48);
+}
+
+function keyToSegwit(key) {
+  var pubKey = new Buffer(s256.keyFromPrivate(key).getPublic(true, 'hex'), 'hex');
+  var scriptHashKey = encode(hash160(pubKey));
+  console.log(b58checkencode(0 + 0x80, key, true),bech32Encode(scriptHashKey))
+  return {
+    private: b58checkencode(0 + 0x80, key, true),
+    public: bech32Encode(scriptHashKey)
+  }
 }
 
 function keyToEthereum(key) {
@@ -130,6 +244,10 @@ var currencies = {
   ethereum: {
     fn: keyToEthereum,
     hashSuffix: 4
+  },
+  segwit: {
+    fn: keyToSegwit,
+    hashSuffix: 1
   }
 }
 
@@ -149,4 +267,3 @@ module.exports = {
 };
 
 //warpwallet('hello', 'a@b.c', 10);
-//warpwallet('hello', 'a@b.c', 18);
