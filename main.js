@@ -106,7 +106,7 @@ function compile(chunks) {
     // opcode
     return accum + 1
   }, 0.0)
-  var buffer = new Buffer(bufferSize)
+  var buffer = Buffer.alloc(bufferSize)
   var offset = 0
 
   chunks.forEach(function (chunk) {
@@ -143,7 +143,7 @@ function compile(chunks) {
 }
 
 function keyToBitcoinish(key, version) {
-  var pubkey = new Buffer(s256.keyFromPrivate(key).getPublic(false, 'hex'), 'hex');
+  var pubkey = Buffer.from(s256.keyFromPrivate(key).getPublic(false, 'hex'), 'hex');
   return {
     private: b58checkencode(version + 0x80, key),
     public: b58checkencode(version, ripemd160(sha256(pubkey))),
@@ -159,7 +159,7 @@ function keyToLitecoin(key) {
 }
 
 function keyToSegwit(key) {
-  var pubKey = new Buffer(s256.keyFromPrivate(key).getPublic(true, 'hex'), 'hex');
+  var pubKey = Buffer.from(s256.keyFromPrivate(key).getPublic(true, 'hex'), 'hex');
   var scriptHashKey = encode(hash160(pubKey));
   console.log(b58checkencode(0 + 0x80, key, true),bech32Encode(scriptHashKey))
   return {
@@ -169,7 +169,7 @@ function keyToSegwit(key) {
 }
 
 function keyToEthereum(key) {
-  var pubkey = new Buffer(s256.keyFromPrivate(key).getPublic(false, 'hex'), 'hex');
+  var pubkey = Buffer.from(s256.keyFromPrivate(key).getPublic(false, 'hex'), 'hex');
   return {
     private: key.toString('hex'),
     public: '0x' + keccak256(pubkey.slice(1)).slice(12).toString('hex')
@@ -183,10 +183,10 @@ function keyToMonero(seed) {
   // Hack
   var kp = ed25519.keyFromSecret()
   kp._privBytes = Array.from(private_spend);
-  var public_spend = new Buffer(kp.pubBytes());
+  var public_spend = Buffer.from(kp.pubBytes());
   var kp = ed25519.keyFromSecret()
   kp._privBytes = Array.from(private_view);
-  var public_view = new Buffer(kp.pubBytes());
+  var public_view = Buffer.from(kp.pubBytes());
 
 
   var address_buf = Buffer.concat([Buffer.alloc(1, 0x12), public_spend, public_view])
@@ -196,7 +196,7 @@ function keyToMonero(seed) {
     address += bs58.encode(address_buf.slice(i*8, i*8+8));
   }
   address += bs58.encode(address_buf.slice(64, 69));
-
+console.log(private_spend.toString('hex'))
   return {
     private_spend: private_spend.toString('hex'),
     private_view: private_view.toString('hex'),
