@@ -196,7 +196,6 @@ function keyToMonero(seed) {
     address += bs58.encode(address_buf.slice(i*8, i*8+8));
   }
   address += bs58.encode(address_buf.slice(64, 69));
-console.log(private_spend.toString('hex'))
   return {
     private_spend: private_spend.toString('hex'),
     private_view: private_view.toString('hex'),
@@ -206,17 +205,46 @@ console.log(private_spend.toString('hex'))
   }
 }
 
+function encryptStrengh(power, altCoin) {  
+  var defaultVal = 1815.9881521;
+  var spow, spow2, defaultSpow=262144, defaultSpow2=65000;
 
+  if (power === 'default' || power === defaultVal) { 
+    spow = defaultSpow;
+    spow2 = defaultSpow2;
+  } else if(String(power).length > 2 ) {
+    var lvl = String(power);
+    var s = parseInt(lvl.substring(0,2)) || 1;
+    var p = parseInt(lvl.substring(2,9)) || 65536;
+    spow = Math.pow(2, s);
+    spow2 = p;
+  } else {
+    spow = Math.pow(2, power);
+    spow2 = Math.pow(2, 16); 
+  }
+  
+  if(altCoin) { 
+    spow = 2; 
+    spow2 = 2;
+  }
+  
+  return { 
+    scrypt: spow, 
+    pbkdf2: spow2
+  };
+}
 
-function warpwallet(password, salt, power, hashSuffix, callback) {
+function warpwallet(password, salt, power, hashSuffix, callback, altCoin=false) {
   var password_buffer = Buffer.from(password, 'utf-8');
   var salt_buffer = Buffer.from(salt, 'utf-8');
   var x1 = Buffer.alloc(1, hashSuffix);
   var x2 = Buffer.alloc(1, hashSuffix + 1);
 
-  scrypt(Buffer.concat([password_buffer, x1]), Buffer.concat([salt_buffer, x1]), Math.pow(2, power), 8, 1, 32, function(error, progress, key1) {
+  var encrypt = encryptStrengh(power, altCoin)
+
+  scrypt(Buffer.concat([password_buffer, x1]), Buffer.concat([salt_buffer, x1]), encrypt.scrypt, 8, 1, 32, function(error, progress, key1) {
     if(key1) {
-      pbkdf2.pbkdf2(Buffer.concat([password_buffer, x2]), Buffer.concat([salt_buffer, x2]), Math.pow(2, 16), 32, 'sha256', function(err, key2) {
+      pbkdf2.pbkdf2(Buffer.concat([password_buffer, x2]), Buffer.concat([salt_buffer, x2]), encrypt.pbkdf2, 32, 'sha256', function(err, key2) {
         for (var i = 0; i < 32; i++) {
           key2[i] = key2[i] ^ key1[i];
         }
@@ -251,8 +279,8 @@ var currencies = {
   }
 }
 
-function generateWallet(passphrase, salt, currency, callback) {
-  warpwallet(passphrase, salt, 18, currencies[currency].hashSuffix, function(progress, result) {
+function generateWallet(passphrase, salt, power, currency, callback) {
+  warpwallet(passphrase, salt, power, currencies[currency].hashSuffix, function(progress, result) {
     if(result) {
       var wallet = currencies[currency].fn(result);
       callback(1, wallet)
