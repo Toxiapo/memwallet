@@ -279,7 +279,7 @@ var currencies = {
   }
 }
 
-function generateWallet(passphrase, salt, power, currency, callback) {
+function generateWallet(passphrase, salt, power, currency, callback, altCoin=false) {
   warpwallet(passphrase, salt, power, currencies[currency].hashSuffix, function(progress, result) {
     if(result) {
       var wallet = currencies[currency].fn(result);
@@ -287,7 +287,7 @@ function generateWallet(passphrase, salt, power, currency, callback) {
     } else {
       callback(progress, null);
     }
-  });
+  }, altCoin);
 }
 
 module.exports = {

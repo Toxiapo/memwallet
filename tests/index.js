@@ -1,13 +1,15 @@
 const wallet = require('../main.js');
 
-function generate(passphrase, salt, power, coin) {
+const isAltCoin = (coin => coin !== 'bitcoin');
+
+function generate(passphrase, salt, power, coin, altCoin) {
 	console.log("Generating " + coin)
 	return new Promise(resolve => {
 		wallet.generateWallet(passphrase, salt, power, coin,(result, wallet) => {
 			if (wallet) {
 				resolve(wallet)
 			}
-		});
+		}, altCoin);
 	})
 }
 
@@ -17,7 +19,7 @@ function generate(passphrase, salt, power, coin) {
 
 	for(let coin of coins) {
 		try {
-			const result = await generate('pass', 'salt', power, coin);
+			const result = await generate('pass', 'salt', power, coin, isAltCoin(coin));
 			console.log(result)
 		} catch (e) {
 			console.log(e)
