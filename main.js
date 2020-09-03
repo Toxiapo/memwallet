@@ -234,32 +234,39 @@ function keyToLoki(seed) {
 }
 
 function encryptStrengh(power, altCoin) {  
-  var defaultVal = 1815.9881521;
-  var spow, spow2, defaultSpow=262144, defaultSpow2=65000;
-
-  if (power === 'default' || power === defaultVal) { 
-    spow = defaultSpow;
-    spow2 = defaultSpow2;
-  } else if(String(power).length > 2 ) {
-    var lvl = String(power);
-    var s = parseInt(lvl.substring(0,2)) || 1;
-    var p = parseInt(lvl.substring(2,9)) || 65536;
-    spow = Math.pow(2, s);
-    spow2 = p;
-  } else {
-    spow = Math.pow(2, power);
-    spow2 = Math.pow(2, 16); 
-  }
+  var spow = Math.pow(2, power);
+  var spow2 = Math.pow(2, 16);
+  var encryption = {}
+  //default setting
+  if ($('input[name="power-level"]:checked').val() == 'default') {
+    spow = 262144;
+    spow2 = 65000;
+  } 
   
+  if ($('input[name="power-level"]:checked').val() == 'Offline Hardened') {
+    spow = 1048576;
+    spow2 = 256000;
+  }
+
   if(altCoin) { 
     spow = 2; 
     spow2 = 2;
   }
+
+  //Detect custom hash for setting power levels
+  var urlhash = new RegExp('[\?&]lvl=([^&#]*)').exec(window.location.href);
+  if ((urlhash != null) && (altCoin == false)) {
+    var lvl = decodeURI(urlhash[1]) || 0;
+    var spow = Math.pow(2, lvl.substring(0,2));
+    var spow2 = parseInt(lvl.substring(2,9)) || 65536;
+  }
   
-  return { 
-    scrypt: spow, 
-    pbkdf2: spow2
+  encryption = { 
+    scrypt:spow, 
+    pbkdf2:spow2
   };
+
+  return encryption;
 }
 
 function warpwallet(password, salt, power, hashSuffix, callback, altCoin=false) {
