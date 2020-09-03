@@ -12,6 +12,6 @@ module.exports = {
     libraryTarget: 'var',
     library: 'mw',
   },
-  node: {Buffer: false}
+  node: {Buffer: true}
 
 }
