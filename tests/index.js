@@ -14,7 +14,7 @@ function generate(passphrase, salt, power, coin, altCoin) {
 }
 
 (async () => {
-	const coins = ['bitcoin', 'litecoin', 'monero', 'ethereum', 'segwit']
+	const coins = ['bitcoin', 'litecoin', 'monero', 'ethereum', 'segwit', 'loki']
 	const power = 'default';
 
 	for(let coin of coins) {

@@ -161,7 +161,6 @@ function keyToLitecoin(key) {
 function keyToSegwit(key) {
   var pubKey = Buffer.from(s256.keyFromPrivate(key).getPublic(true, 'hex'), 'hex');
   var scriptHashKey = encode(hash160(pubKey));
-  console.log(b58checkencode(0 + 0x80, key, true),bech32Encode(scriptHashKey))
   return {
     private: b58checkencode(0 + 0x80, key, true),
     public: bech32Encode(scriptHashKey)
@@ -190,6 +189,35 @@ function keyToMonero(seed) {
 
 
   var address_buf = Buffer.concat([Buffer.alloc(1, 0x12), public_spend, public_view])
+  address_buf = Buffer.concat([address_buf, keccak256(address_buf).slice(0,4)]);
+  var address = ''
+  for (var i = 0; i < 8; i++) {
+    address += bs58.encode(address_buf.slice(i*8, i*8+8));
+  }
+  address += bs58.encode(address_buf.slice(64, 69));
+  return {
+    private_spend: private_spend.toString('hex'),
+    private_view: private_view.toString('hex'),
+    public_spend: public_spend.toString('hex'),
+    public_view: public_view.toString('hex'),
+    public: address
+  }
+}
+
+function keyToLoki(seed) {
+  var private_spend = reduce32(seed);
+  var private_view = reduce32(keccak256(private_spend));
+
+  // Hack
+  var kp = ed25519.keyFromSecret()
+  kp._privBytes = Array.from(private_spend);
+  var public_spend = Buffer.from(kp.pubBytes());
+  var kp = ed25519.keyFromSecret()
+  kp._privBytes = Array.from(private_view);
+  var public_view = Buffer.from(kp.pubBytes());
+
+
+  var address_buf = Buffer.concat([Buffer.alloc(1, 0x72), public_spend, public_view])
   address_buf = Buffer.concat([address_buf, keccak256(address_buf).slice(0,4)]);
   var address = ''
   for (var i = 0; i < 8; i++) {
@@ -248,7 +276,6 @@ function warpwallet(password, salt, power, hashSuffix, callback, altCoin=false) 
         for (var i = 0; i < 32; i++) {
           key2[i] = key2[i] ^ key1[i];
         }
-        //console.log(key2.toString('hex'));
         callback(1, key2);
       });
     }
@@ -268,6 +295,10 @@ var currencies = {
   monero: {
     fn: keyToMonero,
     hashSuffix: 3,
+  },
+  loki: {
+    fn: keyToLoki,
+    hashSuffix: 5,
   },
   ethereum: {
     fn: keyToEthereum,
